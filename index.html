@@ -3,105 +3,157 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ax3InteriAI - Redesign Your Room</title>
+    <title>Ax3InteriAI | AI Interior Designer</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-        body { font-family: 'Inter', sans-serif; }
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&display=swap');
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
     </style>
 </head>
-<body class="bg-gray-50">
+<body class="bg-slate-50 text-slate-900">
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useRef, useEffect } = React;
+        const { useState } = React;
 
-        // --- STYLES DATA ---
         const STYLES = [
-            { id: 'modern', name: 'Modern Minimalist', description: 'Clean lines and neutral colors.', color: 'bg-stone-100' },
-            { id: 'boho', name: 'Bohemian Chic', description: 'Eclectic and organic textures.', color: 'bg-orange-50' },
-            { id: 'industrial', name: 'Industrial Loft', description: 'Raw materials and metal accents.', color: 'bg-slate-200' },
-            { id: 'scandi', name: 'Scandinavian', description: 'Bright, airy, and functional.', color: 'bg-blue-50' }
+            { id: 'modern', name: 'Modern Minimalist', desc: 'Clean, airy, and functional.', prompt: 'ultra-modern minimalist interior, neutral tones, high-end furniture, architectural lighting' },
+            { id: 'boho', name: 'Bohemian Chic', desc: 'Warm, textured, and artistic.', prompt: 'bohemian chic interior, rattan furniture, many indoor plants, warm earth tones, cozy textiles' },
+            { id: 'industrial', name: 'Industrial Loft', desc: 'Raw, edgy, and spacious.', prompt: 'industrial loft style, exposed brick walls, metal accents, leather sofa, large windows' },
+            { id: 'scandi', name: 'Scandinavian', desc: 'Simple, cozy, and bright.', prompt: 'scandinavian interior design, hygge, light wood floors, white walls, minimalist functional furniture' }
         ];
 
         function App() {
-            const [appState, setAppState] = useState('landing');
-            const [uploadedImage, setUploadedImage] = useState(null);
-            const [selectedStyle, setSelectedStyle] = useState(null);
-            const [apiKey, setApiKey] = useState(''); // Safe way: user enters key
-            const [isGenerating, setIsGenerating] = useState(false);
+            const [step, setStep] = useState('auth'); // auth, upload, styles, loading, result
+            const [apiKey, setApiKey] = useState('');
+            const [sourceImg, setSourceImg] = useState(null);
+            const [resultImg, setResultImg] = useState(null);
+            const [error, setError] = useState('');
 
-            // Handle Image Upload
-            const handleImageUpload = (e) => {
+            const handleFile = (e) => {
                 const file = e.target.files[0];
                 if (file) {
                     const reader = new FileReader();
-                    reader.onloadend = () => {
-                        setUploadedImage(reader.result);
-                        setAppState('styles');
-                    };
+                    reader.onloadend = () => { setSourceImg(reader.result); setStep('styles'); };
                     reader.readAsDataURL(file);
                 }
             };
 
-            // Main Landing Page
-            if (appState === 'landing') {
-                return (
-                    <div class="min-h-screen flex flex-col items-center justify-center p-6 text-center">
-                        <h1 class="text-5xl font-bold text-gray-900 mb-4">Ax3InteriAI</h1>
-                        <p class="text-xl text-gray-600 mb-8 max-w-lg">Redesign your room in seconds using AI.</p>
-                        
-                        <div class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md">
-                            <label class="block mb-4 text-sm font-medium text-gray-700">Enter your Gemini API Key</label>
-                            <input 
-                                type="password" 
-                                placeholder="paste key here..." 
-                                class="w-full p-3 border border-gray-300 rounded-lg mb-6 outline-none focus:ring-2 focus:ring-indigo-500"
-                                value={apiKey}
-                                onChange={(e) => setApiKey(e.target.value)}
-                            />
-                            
-                            <label class="cursor-pointer bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-4 rounded-xl font-semibold transition-all inline-block w-full">
-                                Upload Room Photo
-                                <input type="file" class="hidden" accept="image/*" onChange={handleImageUpload} />
-                            </label>
-                        </div>
-                    </div>
-                );
-            }
+            const generateDesign = async (stylePrompt) => {
+                setStep('loading');
+                setError('');
+                try {
+                    const base64Data = sourceImg.split(',')[1];
+                    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent?key=${apiKey}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            contents: [{
+                                parts: [
+                                    { text: `Redesign this exact room in a ${stylePrompt}. Keep the structure, windows, and walls in the same position, but change the furniture and decor.` },
+                                    { inlineData: { mimeType: "image/jpeg", data: base64Data } }
+                                ]
+                            }],
+                            generationConfig: { responseModalities: ["IMAGE"] }
+                        })
+                    });
 
-            // Style Selection Page
-            if (appState === 'styles') {
-                return (
-                    <div class="max-w-4xl mx-auto p-8">
-                        <button onClick={() => setAppState('landing')} class="mb-6 text-indigo-600 font-medium">← Back</button>
-                        <h2 class="text-3xl font-bold mb-8">Select a Design Style</h2>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            {STYLES.map(style => (
-                                <div 
-                                    key={style.id}
-                                    onClick={() => setSelectedStyle(style)}
-                                    class={`p-6 rounded-xl border-2 cursor-pointer transition-all ${selectedStyle?.id === style.id ? 'border-indigo-600 bg-indigo-50' : 'border-gray-200 hover:bg-white'}`}
-                                >
-                                    <h3 class="font-bold text-lg">{style.name}</h3>
-                                    <p class="text-gray-500">{style.description}</p>
-                                </div>
-                            ))}
-                        </div>
+                    const data = await response.json();
+                    if (data.error) throw new Error(data.error.message);
+                    
+                    const outBase64 = data.candidates[0].content.parts.find(p => p.inlineData).inlineData.data;
+                    setResultImg(`data:image/jpeg;base64,${outBase64}`);
+                    setStep('result');
+                } catch (err) {
+                    setError(err.message);
+                    setStep('styles');
+                }
+            };
+
+            // --- Views ---
+            if (step === 'auth') return (
+                <div className="min-h-screen flex flex-col items-center justify-center p-6">
+                    <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl p-8 border border-slate-100">
+                        <h1 className="text-3xl font-bold text-center mb-2">Ax3InteriAI</h1>
+                        <p className="text-slate-500 text-center mb-8">Professional AI Interior Staging</p>
+                        <input 
+                            type="password" 
+                            placeholder="Paste Gemini API Key" 
+                            className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl mb-4 focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                            value={apiKey}
+                            onChange={(e) => setApiKey(e.target.value)}
+                        />
                         <button 
-                            disabled={!selectedStyle || !apiKey}
-                            onClick={() => alert("Ready to connect to API! To make this functional, we'll need to add the fetch request to Gemini.")}
-                            class="mt-10 w-full bg-black text-white py-4 rounded-xl font-bold disabled:opacity-50"
+                            onClick={() => apiKey ? setStep('upload') : alert('Please enter an API key')}
+                            className="w-full py-4 gradient-bg text-white font-bold rounded-xl hover:opacity-90 transition-all shadow-lg"
                         >
-                            Generate Redesign
+                            Get Started
                         </button>
                     </div>
-                );
-            }
+                </div>
+            );
+
+            if (step === 'upload') return (
+                <div className="min-h-screen flex flex-col items-center justify-center p-6">
+                    <h2 className="text-2xl font-bold mb-6 text-center">Step 1: Upload your room</h2>
+                    <label className="w-full max-w-lg aspect-video border-3 border-dashed border-slate-300 rounded-3xl flex flex-col items-center justify-center cursor-pointer hover:border-indigo-400 hover:bg-indigo-50 transition-all group">
+                        <span className="text-indigo-500 text-5xl mb-4 group-hover:scale-110 transition-transform">📸</span>
+                        <p className="text-slate-500 font-medium">Click to upload room photo</p>
+                        <input type="file" className="hidden" accept="image/*" onChange={handleFile} />
+                    </label>
+                </div>
+            );
+
+            if (step === 'styles') return (
+                <div className="max-w-5xl mx-auto p-8">
+                    <header className="flex justify-between items-center mb-10">
+                        <h2 className="text-3xl font-bold">Step 2: Choose your style</h2>
+                        <button onClick={() => setStep('upload')} className="text-slate-500 hover:text-indigo-600 transition-colors">Change Photo</button>
+                    </header>
+                    {error && <div className="bg-red-50 text-red-600 p-4 rounded-xl mb-6 font-medium border border-red-100">{error}</div>}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        {STYLES.map(s => (
+                            <button key={s.id} onClick={() => generateDesign(s.prompt)} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all text-left group">
+                                <div className="w-12 h-12 rounded-lg bg-indigo-50 flex items-center justify-center mb-4 group-hover:bg-indigo-600 group-hover:text-white transition-colors">✨</div>
+                                <h3 className="font-bold text-lg mb-1">{s.name}</h3>
+                                <p className="text-slate-500 text-sm leading-relaxed">{s.desc}</p>
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            );
+
+            if (step === 'loading') return (
+                <div className="min-h-screen flex flex-col items-center justify-center text-center">
+                    <div className="w-16 h-16 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mb-6"></div>
+                    <h2 className="text-2xl font-bold animate-pulse">Designing your masterpiece...</h2>
+                    <p className="text-slate-500 mt-2">This usually takes about 10-15 seconds</p>
+                </div>
+            );
+
+            if (step === 'result') return (
+                <div className="max-w-5xl mx-auto p-8 text-center">
+                    <h2 className="text-3xl font-bold mb-8">Transformation Complete!</h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10">
+                        <div className="rounded-2xl overflow-hidden shadow-lg">
+                            <p className="bg-slate-800 text-white text-xs py-1">ORIGINAL</p>
+                            <img src={sourceImg} className="w-full aspect-video object-cover" />
+                        </div>
+                        <div className="rounded-2xl overflow-hidden shadow-2xl border-4 border-indigo-500">
+                            <p className="bg-indigo-500 text-white text-xs py-1">AI REDESIGN</p>
+                            <img src={resultImg} className="w-full aspect-video object-cover" />
+                        </div>
+                    </div>
+                    <div className="flex flex-col md:flex-row gap-4 justify-center">
+                        <button onClick={() => setStep('styles')} className="px-8 py-3 bg-white border border-slate-200 rounded-xl font-bold hover:bg-slate-50 transition-all">Try Another Style</button>
+                        <a href={resultImg} download="ax3-design.jpg" className="px-8 py-3 gradient-bg text-white rounded-xl font-bold shadow-lg hover:opacity-90 transition-all">Download Design</a>
+                    </div>
+                </div>
+            );
         }
 
         const root = ReactDOM.createRoot(document.getElementById('root'));
