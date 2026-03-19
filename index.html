@@ -3,47 +3,60 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ax3InteriAI - AI Interior Design</title>
+    <title>Ax3InteriAI | AI Interior Design</title>
+
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://unpkg.com/lucide-react@latest"></script>
-    
+
+    <script src="https://www.gstatic.com/firebasejs/9.1.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.1.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.1.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.1.0/firebase-storage-compat.js"></script>
+
     <style>
         @keyframes fade-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         .animate-fade-in { animation: fade-in 0.4s ease-out forwards; }
-        @keyframes progress { 0% { transform: scaleX(0); } 50% { transform: scaleX(0.7); } 100% { transform: scaleX(0.9); } }
-        .animate-progress { animation: progress 5s ease-out forwards; }
         .hide-scrollbar::-webkit-scrollbar { display: none; }
     </style>
 </head>
-<body class="bg-gray-50">
+<body class="bg-gray-50 text-gray-900 font-sans">
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useRef } = React;
+        // --- FIX: Extract Icons from window.lucideReact ---
         const { 
-            Upload, Image: ImageIcon, Sparkles, RefreshCw, Download, 
-            Layout, Palette, X, AlertCircle, Wand2, SlidersHorizontal, 
-            Check, Plus, PaintBucket, ChevronDown, User, LogOut, Save, Grid, Trash2 
-        } = LucideReact;
+            Layout, Upload, Palette, Wand2, Save, Download, User, 
+            LogOut, Check, X, SlidersHorizontal, Trash2, Sparkles, 
+            RefreshCw, Plus, PaintBucket, ChevronDown, Grid, AlertCircle 
+        } = window.lucideReact;
 
-        // --- CONSTANTS ---
-        const ROOM_TYPES = [
-            { id: 'living_room', label: 'Living Room' },
-            { id: 'bedroom', label: 'Bedroom' },
-            { id: 'kitchen', label: 'Kitchen' },
-            { id: 'office', label: 'Home Office' },
-        ];
+        const { useState, useEffect, useRef } = React;
 
-        const STYLES = [
-            { id: 'modern', name: 'Modern Minimalist', color: 'bg-stone-100 text-stone-800', description: 'Clean lines and functional furniture.' },
-            { id: 'boho', name: 'Bohemian Chic', color: 'bg-orange-50 text-orange-900', description: 'Eclectic, colorful, and organic.' },
-            { id: 'industrial', name: 'Industrial Loft', color: 'bg-slate-200 text-slate-800', description: 'Raw materials and metal accents.' },
-            { id: 'japandi', name: 'Japandi', color: 'bg-stone-200 text-stone-800', description: 'Japanese minimalism + Scandi function.' }
-        ];
+        // --- FIREBASE CONFIGURATION ---
+        // REPLACE THESE WITH YOUR KEYS FROM FIREBASE CONSOLE
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "interior-ff78b.firebaseapp.com",
+            projectId: "interior-ff78b",
+            storageBucket: "interior-ff78b.appspot.com",
+            messagingSenderId: "YOUR_ID",
+            appId: "YOUR_APP_ID"
+        };
+
+        // Initialize Firebase
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+        const storage = firebase.storage();
 
         // --- COMPONENTS ---
 
@@ -62,159 +75,176 @@
             return (
                 <div 
                     ref={containerRef}
-                    className="relative w-full h-[400px] rounded-xl overflow-hidden cursor-ew-resize select-none shadow-lg border border-gray-200"
+                    className="relative w-full h-[400px] rounded-2xl overflow-hidden cursor-ew-resize select-none shadow-2xl border border-gray-200"
                     onMouseMove={(e) => handleMove(e.clientX)}
                     onMouseDown={() => { isDragging.current = true; }}
                     onMouseUp={() => { isDragging.current = false; }}
-                    onMouseLeave={() => { isDragging.current = false; }}
                     onTouchMove={(e) => handleMove(e.touches[0].clientX)}
-                    onTouchStart={() => { isDragging.current = true; }}
-                    onTouchEnd={() => { isDragging.current = false; }}
                 >
                     <img src={afterImage} className="absolute inset-0 w-full h-full object-cover" />
-                    <div className="absolute inset-0 h-full overflow-hidden border-r-2 border-white" style={{ width: `${sliderPosition}%` }}>
+                    <div className="absolute inset-0 h-full overflow-hidden border-r-4 border-white" style={{ width: `${sliderPosition}%` }}>
                         <img src={beforeImage} className="absolute inset-0 w-full h-full object-cover" style={{ width: containerRef.current?.offsetWidth }} />
-                        <div className="absolute top-4 left-4 bg-black/60 text-white text-[10px] font-bold px-2 py-1 rounded">ORIGINAL</div>
+                        <div className="absolute top-4 left-4 bg-black/60 text-white text-[10px] font-bold px-2 py-1 rounded backdrop-blur-md">BEFORE</div>
                     </div>
                     <div className="absolute top-0 bottom-0 w-1 bg-white flex items-center justify-center" style={{ left: `${sliderPosition}%` }}>
-                        <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-lg transform -translate-x-1/2">
-                            <SlidersHorizontal className="w-4 h-4 text-indigo-600" />
+                        <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-2xl transform -translate-x-1/2">
+                            <SlidersHorizontal className="w-5 h-5 text-indigo-600" />
                         </div>
                     </div>
+                    <div className="absolute top-4 right-4 bg-indigo-600 text-white text-[10px] font-bold px-2 py-1 rounded shadow-lg">AFTER (AI)</div>
                 </div>
             );
         };
 
         function App() {
+            const [user, setUser] = useState(null);
             const [appState, setAppState] = useState('landing');
             const [uploadedImage, setUploadedImage] = useState(null);
             const [generatedImages, setGeneratedImages] = useState([]);
             const [selectedStyle, setSelectedStyle] = useState(null);
-            const [selectedRoomType, setSelectedRoomType] = useState(ROOM_TYPES[0].id);
+            const [isSaving, setIsSaving] = useState(false);
+            const [toast, setToast] = useState(null);
+
+            useEffect(() => {
+                const unsubscribe = auth.onAuthStateChanged((u) => setUser(u));
+                return () => unsubscribe();
+            }, []);
+
+            const showToast = (msg) => {
+                setToast(msg);
+                setTimeout(() => setToast(null), 3000);
+            };
+
+            const handleLogin = async () => {
+                const provider = new firebase.auth.GoogleAuthProvider();
+                try {
+                    await auth.signInWithPopup(provider);
+                    showToast("Welcome back!");
+                } catch (e) { console.error(e); }
+            };
 
             const handleImageUpload = (e) => {
                 const file = e.target.files[0];
                 if (file) {
                     const reader = new FileReader();
-                    reader.onloadend = () => {
-                        setUploadedImage(reader.result);
+                    reader.onload = (ev) => {
+                        setUploadedImage(ev.target.result);
                         setAppState('styles');
                     };
                     reader.readAsDataURL(file);
                 }
             };
 
-            const simulateGeneration = () => {
-                setAppState('generating');
-                // Simulate API Delay
-                setTimeout(() => {
-                    // For demo purposes, we use the uploaded image as the "result" 
-                    // In the real app, this would be the base64 from Craw4AI
-                    setGeneratedImages([uploadedImage, uploadedImage, uploadedImage]);
-                    setAppState('results');
-                }, 3000);
+            const handleSaveDesign = async () => {
+                if (!user) return handleLogin();
+                setIsSaving(true);
+                try {
+                    const response = await fetch(uploadedImage);
+                    const blob = await response.blob();
+                    const filename = `design_${Date.now()}.jpg`;
+                    const storageRef = storage.ref(`users/${user.uid}/designs/${filename}`);
+                    
+                    await storageRef.put(blob);
+                    const url = await storageRef.getDownloadURL();
+                    
+                    await db.collection("users").doc(user.uid).collection("designs").add({
+                        imageUrl: url,
+                        storagePath: `users/${user.uid}/designs/${filename}`,
+                        style: selectedStyle?.name || "Modern",
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    
+                    showToast("Design saved to cloud!");
+                } catch (e) { 
+                    console.error(e);
+                    showToast("Failed to save.");
+                } finally {
+                    setIsSaving(false);
+                }
             };
 
             return (
-                <div className="min-h-screen flex flex-col font-sans">
+                <div className="min-h-screen flex flex-col">
                     {/* Header */}
-                    <header className="bg-white border-b px-6 h-16 flex items-center justify-between sticky top-0 z-50">
-                        <div className="flex items-center gap-2 cursor-pointer" onClick={() => setAppState('landing')}>
-                            <div className="bg-indigo-600 text-white p-1.5 rounded-lg"><Layout size={20} /></div>
-                            <span className="font-bold text-xl">Ax3InteriAI</span>
+                    <header className="bg-white/90 backdrop-blur-md border-b h-16 flex items-center justify-between px-8 sticky top-0 z-50">
+                        <div className="flex items-center gap-2 font-black text-2xl text-indigo-600 cursor-pointer" onClick={() => setAppState('landing')}>
+                            <Layout className="bg-indigo-600 text-white p-1 rounded-lg" size={28} /> Ax3InteriAI
                         </div>
-                        <button className="text-sm font-medium text-gray-600 flex items-center gap-2 bg-gray-100 px-4 py-2 rounded-lg">
-                            <User size={16} /> Login
-                        </button>
+                        <div>
+                            {user ? (
+                                <button onClick={() => auth.signOut()} className="flex items-center gap-2 text-sm font-bold text-red-500 bg-red-50 px-5 py-2 rounded-full">
+                                    <LogOut size={16} /> Logout
+                                </button>
+                            ) : (
+                                <button onClick={handleLogin} className="flex items-center gap-2 text-sm font-bold bg-indigo-600 text-white px-6 py-2 rounded-full shadow-lg">
+                                    <User size={16} /> Sign In
+                                </button>
+                            )}
+                        </div>
                     </header>
 
-                    <main className="flex-grow">
+                    {/* Main Section */}
+                    <main className="flex-grow flex flex-col items-center justify-center p-6">
                         {appState === 'landing' && (
-                            <div className="max-w-4xl mx-auto pt-20 text-center px-6 animate-fade-in">
-                                <div className="w-16 h-16 bg-indigo-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                                    <Wand2 className="text-indigo-600" size={32} />
-                                </div>
-                                <h1 className="text-5xl font-bold mb-6">Redesign your room <span className="text-indigo-600">in seconds.</span></h1>
-                                <p className="text-gray-600 text-lg mb-10">Upload a photo and let AI transform your space.</p>
-                                
-                                <div className="max-w-xs mx-auto mb-8">
-                                    <select 
-                                        className="w-full p-4 rounded-xl border border-gray-200 bg-white"
-                                        value={selectedRoomType}
-                                        onChange={(e) => setSelectedRoomType(e.target.value)}
-                                    >
-                                        {ROOM_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
-                                    </select>
-                                </div>
-
-                                <label className="inline-flex items-center gap-3 bg-gray-900 text-white px-8 py-4 rounded-full font-bold cursor-pointer hover:scale-105 transition-transform">
-                                    <Upload size={20} /> Upload Photo
+                            <div className="text-center max-w-3xl animate-fade-in">
+                                <h1 className="text-6xl font-black mb-6 leading-tight">Elevate your space with <span className="text-indigo-600">AI precision.</span></h1>
+                                <p className="text-gray-500 text-xl mb-12">Professional interior renders in seconds.</p>
+                                <label className="bg-gray-900 text-white px-10 py-5 rounded-2xl font-bold text-xl cursor-pointer hover:scale-105 transition-transform shadow-2xl inline-flex items-center gap-4">
+                                    <Upload /> Upload Room Photo
                                     <input type="file" className="hidden" onChange={handleImageUpload} />
                                 </label>
                             </div>
                         )}
 
                         {appState === 'styles' && (
-                            <div className="max-w-5xl mx-auto p-6 animate-fade-in">
-                                <h2 className="text-2xl font-bold mb-6">Select a Style</h2>
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
-                                    {STYLES.map(s => (
+                            <div className="w-full max-w-5xl animate-fade-in">
+                                <h2 className="text-3xl font-bold mb-8">Select Design Aesthetic</h2>
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-12">
+                                    {['Modern', 'Minimalist', 'Industrial', 'Boho'].map(style => (
                                         <div 
-                                            key={s.id} 
-                                            onClick={() => setSelectedStyle(s)}
-                                            className={`p-6 rounded-2xl border-2 cursor-pointer transition-all ${selectedStyle?.id === s.id ? 'border-indigo-600 bg-indigo-50' : 'border-gray-100 bg-white'}`}
+                                            key={style}
+                                            onClick={() => setSelectedStyle({name: style})}
+                                            className={`p-10 rounded-3xl border-4 cursor-pointer text-center transition-all ${selectedStyle?.name === style ? 'border-indigo-600 bg-indigo-50 shadow-xl scale-105' : 'border-white bg-white'}`}
                                         >
-                                            <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-4 ${s.color}`}><Palette size={20} /></div>
-                                            <h3 className="font-bold">{s.name}</h3>
-                                            <p className="text-xs text-gray-500 mt-2">{s.description}</p>
+                                            <Palette className="mx-auto mb-4 text-indigo-600" size={32} />
+                                            <span className="font-bold text-lg">{style}</span>
                                         </div>
                                     ))}
                                 </div>
                                 <button 
-                                    onClick={simulateGeneration}
+                                    onClick={() => setAppState('results')}
+                                    className="w-full py-6 bg-indigo-600 text-white rounded-3xl font-black text-2xl shadow-2xl hover:bg-indigo-700 disabled:opacity-20"
                                     disabled={!selectedStyle}
-                                    className="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold disabled:opacity-50"
                                 >
-                                    Generate Design
+                                    GENERATE TRANSFORMATION
                                 </button>
                             </div>
                         )}
 
-                        {appState === 'generating' && (
-                            <div className="flex flex-col items-center justify-center pt-40">
-                                <div className="w-16 h-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-6"></div>
-                                <h2 className="text-xl font-bold">AI is working its magic...</h2>
-                                <p className="text-gray-500 mt-2">Transforming your {selectedRoomType.replace('_', ' ')}</p>
-                            </div>
-                        )}
-
                         {appState === 'results' && (
-                            <div className="max-w-6xl mx-auto p-6 animate-fade-in">
-                                <div className="flex justify-between items-end mb-6">
-                                    <h2 className="text-3xl font-bold">Transformation Complete!</h2>
-                                    <button onClick={() => setAppState('landing')} className="text-indigo-600 font-bold">Start Over</button>
+                            <div className="w-full max-w-6xl grid lg:grid-cols-3 gap-10 animate-fade-in">
+                                <div className="lg:col-span-2">
+                                    <ComparisonSlider beforeImage={uploadedImage} afterImage={uploadedImage} />
                                 </div>
-                                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                                    <div className="lg:col-span-2">
-                                        <ComparisonSlider beforeImage={uploadedImage} afterImage={generatedImages[0]} />
-                                    </div>
-                                    <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm space-y-4">
-                                        <h3 className="font-bold flex items-center gap-2"><PaintBucket size={18}/> Actions</h3>
-                                        <button className="w-full py-3 bg-indigo-600 text-white rounded-lg font-bold flex items-center justify-center gap-2">
-                                            <Save size={18} /> Save to Gallery
+                                <div className="space-y-6">
+                                    <div className="bg-white p-8 rounded-3xl shadow-xl border border-gray-100">
+                                        <h3 className="font-black text-xl mb-6 flex items-center gap-2"><Sparkles className="text-indigo-600"/> Design Ready</h3>
+                                        <button onClick={handleSaveDesign} disabled={isSaving} className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-bold mb-4 flex items-center justify-center gap-2">
+                                            {isSaving ? "Saving..." : <><Save size={20}/> Save to Cloud</>}
                                         </button>
-                                        <button className="w-full py-3 bg-gray-900 text-white rounded-lg font-bold flex items-center justify-center gap-2">
-                                            <Download size={18} /> Download
-                                        </button>
+                                        <button onClick={() => setAppState('landing')} className="w-full py-4 bg-gray-100 text-gray-700 rounded-2xl font-bold">Start New Project</button>
                                     </div>
                                 </div>
                             </div>
                         )}
                     </main>
 
-                    <footer className="p-8 border-t text-center text-gray-400 text-sm">
-                        © 2026 Ax3InteriAI. Powered by Craw4AI.
-                    </footer>
+                    {/* Toast Notification */}
+                    {toast && (
+                        <div className="fixed bottom-8 right-8 bg-gray-900 text-white px-8 py-4 rounded-2xl shadow-2xl flex items-center gap-3 animate-fade-in z-[100]">
+                            <Check className="text-green-400" /> <span className="font-bold">{toast}</span>
+                        </div>
+                    )}
                 </div>
             );
         }
